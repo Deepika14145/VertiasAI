@@ -1,0 +1,5 @@
+{
+  "name": "Veritas AI: Misinformation Combat Tool",
+  "description": "An AI-powered tool that detects potential misinformation and educates users on identifying credible, trustworthy content. It provides a detailed analysis including source credibility, emotional tone, political bias, and an explainable AI dashboard.",
+  "requestFramePermissions": []
+}
