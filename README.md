@@ -1,4 +1,4 @@
-````markdown
+
 # VeritasAI
 
 **VeritasAI** is a modern AI-powered tool designed to analyze the credibility of news, claims, and content. It leverages advanced NLP, machine learning, and retrieval-based evidence analysis to provide fact-checked results, explanations, and credibility scores. VeritasAI also supports Chrome Extension integration for real-time fact-checking on the web.
