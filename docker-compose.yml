@@ -1,18 +1,44 @@
-version: "3.8"
+version: "3.9"
+
 services:
   backend:
     build: ./backend
+    container_name: truthlens-backend
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - ./backend:/app
     ports:
       - "8000:8000"
-    volumes:
-      - ./backend/app:/app/app
     environment:
-      - PYTHONUNBUFFERED=1
+      - GENAI_API_KEY=${GENAI_API_KEY}
+      - PYTESSERACT_PATH=/usr/bin/tesseract
+    depends_on:
+      - db
+
   frontend:
-    build:
-      context: ./frontend
-    command: ["npm", "start"]
-    ports:
-      - "3000:3000"
+    build: ./frontend_app
+    container_name: truthlens-frontend
+    command: npm run dev -- --host 0.0.0.0 --port 5173
     volumes:
-      - ./frontend:/app
+      - ./frontend_app:/app
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://backend:8000
+    depends_on:
+      - backend
+
+  db:
+    image: postgres:15
+    container_name: truthlens-db
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin
+      POSTGRES_DB: truthlens
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:

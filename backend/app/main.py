@@ -8,14 +8,16 @@ from .schemas import AnalysisResponse, Evidence
 from .utils import make_id, save_json
 from .retriever import query as retrieve_query
 from .genai_client import generate_text, get_embeddings, TEXT_MODEL
+from .db import SessionLocal, Analysis, Audit
 from bs4 import BeautifulSoup
 import requests
 from PIL import Image
 import pytesseract
 import fitz  # PyMuPDF
 import matplotlib.pyplot as plt
+from datetime import datetime
 
-app = FastAPI(title="TruthLens API")
+app = FastAPI(title="VeritasAI API")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 # --------------------------
@@ -63,6 +65,39 @@ def combine_signals(confidence: float, retrieval_count: int) -> float:
         return round(base*0.6,2)
     return round(min(100, base + retrieval_count*5),2)
 
+def save_analysis_to_db(resp, raw_request, raw_response):
+    db = SessionLocal()
+    try:
+        analysis_entry = Analysis(
+            claim=resp.source_text.split("\n")[0][:600],
+            source_text=resp.source_text,
+            verdict=resp.verdict,
+            credibility_score=resp.credibility_score,
+            explanation=resp.explanation,
+            emotional_tone=resp.emotional_tone,
+            claim_category=resp.claim_category,
+            political_bias=resp.political_bias,
+            persuasion_techniques=resp.persuasion_techniques,
+            education_tips=resp.education_tips,
+            evidences=[e.dict() for e in resp.evidences],
+            analysis_plot_png=base64.b64decode(resp.analysis_plot_png_base64) if resp.analysis_plot_png_base64 else None,
+            created_at=datetime.utcnow()
+        )
+        db.add(analysis_entry)
+        db.commit()
+        db.refresh(analysis_entry)
+
+        audit_entry = Audit(
+            analysis_id=analysis_entry.id,
+            raw_request=raw_request,
+            raw_response=raw_response,
+            created_at=datetime.utcnow()
+        )
+        db.add(audit_entry)
+        db.commit()
+    finally:
+        db.close()
+
 # --------------------------
 # Analyze endpoint
 # --------------------------
@@ -84,7 +119,7 @@ async def analyze(
             text = body.get("text") or text
             url = body.get("url") or url
         except:
-            pass
+            body = {}
 
     # 2️⃣ Check if at least one input is provided
     if not (text or url or file):
@@ -188,9 +223,12 @@ TOP_EVIDENCE:
         source_text = source_text[:4000]
     )
 
-    # 11️⃣ Save audit
+    # 11️⃣ Save audit to JSON
     os.makedirs(os.path.join(os.path.dirname(__file__), "audits"), exist_ok=True)
     save_json(os.path.join(os.path.dirname(__file__), "audits", f"{resp.id}.json"),
               {"claim":claim, "parsed":parsed, "evidences":evidences, "scores":scores, "source_text": source_text[:4000]})
+
+    # 12️⃣ Save analysis and audit to database
+    save_analysis_to_db(resp, raw_request=body if 'body' in locals() else {}, raw_response=resp.dict())
 
     return resp
